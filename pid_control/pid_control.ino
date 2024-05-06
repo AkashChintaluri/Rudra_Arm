@@ -4,14 +4,16 @@
 #include <ezButton.h>
 
 MPU6050 mpu;
-Servo sb1;
+Servo ct1;
 ezButton limitSwitch(7);
 
 unsigned long previousTime = 0;
 float deltaTime = 0;
 
 float gyroY = 0;
+float accelY = 0;
 float angleY = 0;
+float alpha = 0.98; //Complemenatary Filter
 
 // PID constants
 float Kp = 2.7;
@@ -41,10 +43,9 @@ void setup() {
 
     Wire.begin();
     mpu.initialize();
-    mpu.setFullScaleGyroRange(MPU6050_GYRO_FS_250);
   
-    sb1.attach(sabertoothPin1);
-    sb1.writeMicroseconds(1500);
+    ct1.attach(sabertoothPin1);
+    ct1.writeMicroseconds(1500);
 }
 
 void loop() {
@@ -52,19 +53,20 @@ void loop() {
     limitSwitch.loop();
 
     if(loop_check == 0){
-      sb1.writeMicroseconds(1000);
+      ct1.writeMicroseconds(1000);
       Serial.println(1000);
       if(limitSwitch.getState() == LOW){
 
-        Serial.print("Pressed");
+        Serial.println("Pressed");
         
         int16_t gyroRaw[3];
-        mpu.getRotation(&gyroRaw[0], &gyroRaw[1], &gyroRaw[2]);
+        int16_t accelRaw[3];
+        mpu.getMotion6(&accelRaw[0], &accelRaw[1], &accelRaw[2], &gyroRaw[0], &gyroRaw[1], &gyroRaw[2]);
       
         float offsetY = gyroRaw[1] / 65.5;
-        offset += (gyroY * deltaTime);
+        offset = (offsetY * deltaTime);
 
-        sb1.writeMicroseconds(1500);
+        ct1.writeMicroseconds(1500);
 
         loop_check = 1;
         return;
@@ -77,11 +79,12 @@ void loop() {
       previousTime = currentTime;
     
       int16_t gyroRaw[3];
-      mpu.getRotation(&gyroRaw[0], &gyroRaw[1], &gyroRaw[2]);
+      int16_t accelRaw[3];
+      mpu.getMotion6(&accelRaw[0], &accelRaw[1], &accelRaw[2], &gyroRaw[0], &gyroRaw[1], &gyroRaw[2]);
     
       gyroY = gyroRaw[1] / 65.5;
       
-      angleY += (gyroY * deltaTime) - offset;
+      angleY = (gyroY * deltaTime) - offset;
       int roundedAngleY = round(angleY);
       
     
@@ -99,7 +102,7 @@ void loop() {
   
         if (abs(error) < 1) {
             Serial.println("Desired angle achieved!");
-            sb1.writeMicroseconds(1500);
+            ct1.writeMicroseconds(1500);
         }
     
         int motorCommand;
@@ -109,17 +112,17 @@ void loop() {
             motorCommand = map(abs(output), 0, 360, 1300, 1000);
         }
         
-        Serial.print("Motor Command: ");
-        Serial.println(motorCommand);
+        //Serial.print("Motor Command: ");
+        //Serial.println(motorCommand);
         
-        sb1.writeMicroseconds(motorCommand);
+        ct1.writeMicroseconds(motorCommand);
     
         Serial.print("Current Angle: ");
         Serial.println(roundedAngleY);
         Serial.print("Desired Angle: ");
         Serial.println(desiredAngle);
-        Serial.print("PID output: ");
-        Serial.println(output);
+        //Serial.print("PID output: ");
+        //Serial.println(output);
         
         previousError = error;
         
@@ -127,7 +130,9 @@ void loop() {
       else{
         Serial.print("Current Angle: ");
         Serial.println(roundedAngleY);
-        sb1.writeMicroseconds(1500);
+        //Serial.print("Offset: ");
+        //Serial.println(offset);
+        ct1.writeMicroseconds(1500);
       }
     }
   delay(100);
