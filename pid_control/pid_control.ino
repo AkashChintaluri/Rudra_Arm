@@ -1,9 +1,9 @@
 #include <Wire.h>
 #include <Servo.h>
-#include <MPU6050.h>
+#include <basicMPU6050.h>
 #include <ezButton.h>
 
-MPU6050 mpu;
+basicMPU6050<> mpu;
 Servo ct1;
 ezButton limitSwitch(7);
 
@@ -13,7 +13,7 @@ float deltaTime = 0;
 float gyroY = 0;
 float accelY = 0;
 float angleY = 0;
-float alpha = 0.98; //Complemenatary Filter
+float alpha = 0.9868; //Complemenatary Filter
 
 // PID constants
 float Kp = 2.7;
@@ -29,7 +29,7 @@ float derivative = 0;
 int desiredAngle = 0;
 
 // Sabertooth pins
-const int sabertoothPin1 = 9;
+const int cytronPin = 9;
 
 float offset = 0;
 float g_offset = 11;
@@ -42,9 +42,9 @@ void setup() {
     limitSwitch.setDebounceTime(50);
 
     Wire.begin();
-    mpu.initialize();
+    mpu.setup();
   
-    ct1.attach(sabertoothPin1);
+    ct1.attach(cytronPin);
     ct1.writeMicroseconds(1500);
 }
 
@@ -58,17 +58,21 @@ void loop() {
       if(limitSwitch.getState() == LOW){
 
         Serial.println("Pressed");
+
+        unsigned long currentTime = millis();
+        deltaTime = (currentTime - previousTime) / 1000.0;
+        previousTime = currentTime;
         
-        int16_t gyroRaw[3];
-        int16_t accelRaw[3];
-        mpu.getMotion6(&accelRaw[0], &accelRaw[1], &accelRaw[2], &gyroRaw[0], &gyroRaw[1], &gyroRaw[2]);
-      
-        float offsetY = gyroRaw[1] / 65.5;
-        offset = (offsetY * deltaTime);
+        //offset = alpha * (offset + (mpu.gy() * (180 / PI)) * deltaTime) + (0.0132)*(mpu.ay() * 9.81);
+        offset += (mpu.gy() * (180 / PI)) * deltaTime;
 
         ct1.writeMicroseconds(1500);
 
         loop_check = 1;
+
+        previousTime = 0;
+        deltaTime = 0;
+        
         return;
       }
     }
@@ -77,16 +81,10 @@ void loop() {
       unsigned long currentTime = millis();
       deltaTime = (currentTime - previousTime) / 1000.0;
       previousTime = currentTime;
-    
-      int16_t gyroRaw[3];
-      int16_t accelRaw[3];
-      mpu.getMotion6(&accelRaw[0], &accelRaw[1], &accelRaw[2], &gyroRaw[0], &gyroRaw[1], &gyroRaw[2]);
-    
-      gyroY = gyroRaw[1] / 65.5;
       
-      angleY = (gyroY * deltaTime) - offset;
+      //angleY = (alpha * (angleY + (mpu.gy() * (180 / PI)) * deltaTime) + (0.0132)*(mpu.ay() * 9.81)) - offset;
+      angleY += (mpu.gy() * (180 / PI)) * deltaTime;
       int roundedAngleY = round(angleY);
-      
     
       if (Serial.available() > 0 && desiredAngle == 0) {
         desiredAngle = Serial.parseInt();
