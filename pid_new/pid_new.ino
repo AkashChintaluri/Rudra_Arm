@@ -47,6 +47,7 @@ void loop() {
   if(loop_check == 0){
 
     ct1.writeMicroseconds(1000);
+    Serial.println(1000);
     if(limitSwitch.getState() == LOW) {
       
       Serial.println("Pressed");
