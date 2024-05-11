@@ -78,42 +78,48 @@ void loop() {
 
   float error = desiredAngle - roundedAngleY;
 
-  if(abs(error != 0)){
+  if(abs(error <= 90){
+    if(abs(error) > 1){
 
-    if(limitSwitch1.isPressed()){
+      if(limitSwitch1.isPressed()){
 
-      Serial.println("Cannot move, limit switch is pressed");
-      ct.writeMicroseconds(1600);
-      delay(10);
-      desiredAngle = roundedAngleY;
-    }
-    else if(limitSwitch2.isPressed()){
+        Serial.println("Cannot move, limit switch is pressed");
+        ct.writeMicroseconds(1600);
+        delay(10);
+        desiredAngle = roundedAngleY;
+      }
+      else if(limitSwitch2.isPressed()){
 
-      Serial.println("Cannot move, limit switch is pressed");
-      ct.writeMicroseconds(1400);
-      delay(10);
-      desiredAngle = roundedAngleY;
+        Serial.println("Cannot move, limit switch is pressed");
+        ct.writeMicroseconds(1400);
+        delay(10);
+        desiredAngle = roundedAngleY;
+      }
+      else{
+
+        integral += error * dt;
+        derivative = (error - previousError) / dt;
+        float output = Kp * error + Ki * integral + Kd * derivative;
+
+        Serial.print("Output: ");
+        Serial.println(output);
+
+        if(error > 0){
+          ct.writeMicroseconds(1500 + output);
+        }else{
+          ct.writeMicroseconds(1500 - output);
+        }
+        previousError = error;
+      }
     }
     else{
 
-      integral += error * dt;
-      derivative = (error - previousError) / dt;
-      float output = Kp * error + Ki * integral + Kd * derivative;
-
-      Serial.print("Output: ");
-      Serial.println(output);
-
-      if(error > 0){
-        ct.writeMicroseconds(1500 + output);
-      }else{
-        ct.writeMicroseconds(1500 - output);
-      }
-      previousError = error;
+      Serial.println("Desired angle achieved!");
+      ct.writeMicroseconds(1500);
     }
   }
   else{
-
-    Serial.println("Desired angle achieved!");
+    Serial.println("Incorrect IMU position, please adjust the IMU position.");
     ct.writeMicroseconds(1500);
   }
 
