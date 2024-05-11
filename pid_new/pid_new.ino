@@ -5,7 +5,8 @@
 
 basicMPU6050<> mpu;
 Servo ct;
-ezButton limitSwitch(7);
+ezButton limitSwitch1(7);
+ezButton limitSwitch2(6);
 
 // PID constants
 const float Kp = 2.7;
@@ -49,13 +50,13 @@ void setup() {
 }
 
 void loop() {
-
-  limitSwitch.loop();
   
+  limitSwitch.loop();
+    
   unsigned long currentTime = millis();
   dt = (currentTime - previousTime) / 1000.0;
   previousTime = currentTime;
-
+  
   float accelX = mpu.ax() * 9.81;
   float accelZ = mpu.az() * 9.81;
 
@@ -68,55 +69,54 @@ void loop() {
 
   angleY = alpha * (angleY + angleY_gyro) + (1 - alpha) * angleY_accel;
   int roundedAngleY = round(angleY);
+  Serial.print("Rounded Angle: ");
+  Serial.println(roundedAngleY);
 
-  if (Serial.available() > 0 && desiredAngle == 0) {
+  if (Serial.available() > 0) {
     desiredAngle = Serial.parseInt();
   }
 
-  if(limitSwitch.getState() == HIGH && roundedAngleY >= 0 && abs(desiredAngle-roundedAngleY) <= 90){
+  float error = desiredAngle - roundedAngleY;
 
-    if(desiredAngle != 0){
-      
-      float error = desiredAngle - roundedAngleY;
-      integral += error * dt;
-      derivative = (error - previousError) / dt;
-      float output = Kp*error + Ki*integral + Kd*derivative;
-  
-      if (abs(error) < 1) {
-        Serial.println("Desired angle achieved!");
-        ct.writeMicroseconds(1500);
-      }
-      else {
-          
-        int motorCommand;
-        if (output >= 0)
-            motorCommand = map(output, 0, 360, 1500, 1700);
-        else
-            motorCommand = map(abs(output), 0, 360, 1500, 1300);
-  
-        ct.writeMicroseconds(motorCommand);
-          
-        Serial.print("Current Angle: ");
-        Serial.println(roundedAngleY);
-        Serial.print("Desired Angle: ");
-        Serial.println(desiredAngle);
-        
-        previousError = error;
-  
-      }
+  if(abs(error != 0)){
+
+    if(limitSwitch1.isPressed()){
+
+      Serial.println("Cannot move, limit switch is pressed");
+      ct.writeMicroseconds(1600);
+      delay(10);
+      desiredAngle = roundedAngleY;
+    }
+    else if(limitSwitch2.isPressed()){
+
+      Serial.println("Cannot move, limit switch is pressed");
+      ct.writeMicroseconds(1400);
+      delay(10);
+      desiredAngle = roundedAngleY;
     }
     else{
 
-      ct.writeMicroseconds(1500);
-      Serial.print("Current Angle: ");
-      Serial.println(roundedAngleY);
+      integral += error * dt;
+      derivative = (error - previousError) / dt;
+      float output = Kp * error + Ki * integral + Kd * derivative;
+
+      Serial.print("Output: ");
+      Serial.println(output);
+
+      if(error > 0){
+        ct.writeMicroseconds(1500 + output);
+      }else{
+        ct.writeMicroseconds(1500 - output);
+      }
+      previousError = error;
     }
   }
   else{
-    
-    Serial.print("Current Angle: ");
-    Serial.println(roundedAngleY);
-    Serial.println("Arm Stopped");
+
+    Serial.println("Desired angle achieved!");
     ct.writeMicroseconds(1500);
   }
+
+  ct.writeMicroseconds(1500);
+
 }
